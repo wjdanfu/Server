@@ -1,47 +1,41 @@
 package com.example.mummoomserver.login.config;
 
+import com.example.mummoomserver.login.service.OAuth2Service;
 import com.example.mummoomserver.login.token.jwt.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableGlobalMethodSecurity(prePostEnabled = true, securedEnabled = true) // 특정 주소 접근시 권한 및 인증을 위한 어노테이션 활성화
 public class SecurityConfigurer extends WebSecurityConfigurerAdapter {
 
-
+    private final OAuth2Service oAuth2Service;
     /**
      * 현석 - 해당 userDetailService를 이용할 필요가 없어서 주석 처리함
      */
 //    private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    /*
-         AuthenticationManager 에서 authenticate 메소드를 실행할때
-         내부적으로 사용할 UserDetailsService 와 PasswordEncoder 를 설정
-    */
-
-//    @Override
-//    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-//        auth.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder());
-//    }
-
-
-
-
+    @Bean
+    public BCryptPasswordEncoder encodePwd() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
@@ -49,7 +43,8 @@ public class SecurityConfigurer extends WebSecurityConfigurerAdapter {
         http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
                 .csrf().ignoringAntMatchers("/h2-console/**").disable()
-                //.headers().frameOptions().disable()// csrf 토큰을 매번 받지 않아도 된다.
+                .headers().frameOptions().disable()// csrf 토큰을 매번 받지 않아도 된다.
+                .and()
                 .cors().disable()
                 .formLogin().disable() //폼 로그인 방식을 사용하지 않는다.
                 .logout().disable() // 로그아웃 uri를 사용하기 위한 설정 (점검 필요)
@@ -63,7 +58,8 @@ public class SecurityConfigurer extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.PUT, "/**").permitAll()
                 .antMatchers(HttpMethod.DELETE, "/**").permitAll()
                 .antMatchers(HttpMethod.POST, "/**").permitAll()
-                .antMatchers("/oauth2/**").permitAll()
+                .antMatchers("/login/oauth2/code/google").permitAll()
+                .antMatchers("/login/oauth2/code/kakao").permitAll()
                 .antMatchers(
                         "/v2/api-docs",
                         "/swagger-resources/**",
@@ -71,17 +67,21 @@ public class SecurityConfigurer extends WebSecurityConfigurerAdapter {
                         /*Probably not needed*/ "/swagger.json").permitAll()
                 .anyRequest().authenticated() // 그 이외에는 인증된 사용자만 접근 가능하다
                 .and()
-                .exceptionHandling()
-                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED));
+                .logout()
+                .logoutSuccessUrl("/")
+                .and()
+                .oauth2Login()
+                .userInfoEndpoint()
+                .userService(oAuth2Service);
         //로그인 인증을 진행하는 필터 이전에 jwtAuthenticationFilter 가 실행되도록 설정
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
     }
 
-    /*PasswordEncoder를 BCryptPasswordEncoder로 사용하도록 Bean 등록*/
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+//    /*PasswordEncoder를 BCryptPasswordEncoder로 사용하도록 Bean 등록*/
+//    @Bean
+//    public PasswordEncoder passwordEncoder() {
+//        return new BCryptPasswordEncoder();
+//    }
 
     @Bean
     @Override

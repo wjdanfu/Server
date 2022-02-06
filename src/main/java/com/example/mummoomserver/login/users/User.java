@@ -3,6 +3,7 @@ package com.example.mummoomserver.login.users;
 
 import com.example.mummoomserver.config.BaseTimeEntity;
 import com.example.mummoomserver.domain.Comment.Comment;
+import com.example.mummoomserver.domain.Likecnt.entity.Likecnt;
 import com.example.mummoomserver.domain.Post.Post;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -16,11 +17,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 // 회원 테이블과 매핑되는 user entity 클래스
-@Getter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "User")
+@Builder
 public class User extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,7 +36,7 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false) //소셜로그인인 경우에는 사용하지 않는 다는 것에 대한 설정 필요
     private String password;
 
-    @Column()
+    @Column
     private String imgUrl;
 
     @Enumerated(value = EnumType.STRING)  // 일반 로그인인지 소셜 로그인인지 확인하는 컬럼
@@ -45,11 +46,14 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private Role role;
 
-    @OneToMany(mappedBy = "userIdx", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Post> posts = new ArrayList<>();
 
-    @OneToMany(mappedBy = "userIdx", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Comment> comments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<Likecnt> likecnts = new ArrayList<>();
 
     @Builder
     public User(String nickName, String email, String password, String imgUrl, UserType type, Role role) {

@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
@@ -30,7 +31,7 @@ import javax.validation.Valid;
 import java.io.IOException;
 
 @Slf4j
-@RestController
+@Controller
 @RequiredArgsConstructor
 @RequestMapping("/api/users")
 public class UserController {
@@ -63,8 +64,7 @@ public class UserController {
     @PostMapping("/login")
     public void login(@RequestBody @Valid LoginRequest loginRequest, HttpServletResponse httpServletResponse) throws IOException {
         //실패시
-        User member = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 E-MAIL 입니다."));
+        User member = userRepository.findByEmail(loginRequest.getEmail()).orElseThrow(() -> new IllegalArgumentException("가입되지 않은 E-MAIL 입니다."));
         //비밀번호 틀릴 시
         if (!passwordEncoder.matches(loginRequest.getPassword(), member.getPassword())) {
             throw new IllegalArgumentException("잘못된 비밀번호입니다.");
@@ -72,7 +72,7 @@ public class UserController {
         // 로그인 성공 시
         // 토큰 발급 쉽게 수정하거나 변경하기
         // 유저 닉네임을 삽입
-        String token = jwtProvider.createToken(member.getNickName(), member.getRole());
+        String token = jwtProvider.createToken(member.getEmail(), member.getRole());
 
         jwtProvider.writeTokenResponse(httpServletResponse, token);
     }

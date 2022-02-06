@@ -1,6 +1,5 @@
 package com.example.mummoomserver.login.users;
 
-import com.example.mummoomserver.login.users.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -17,6 +16,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByNickName(String nickname);
 
+
     boolean existsByEmail(String email);
+
 
 }

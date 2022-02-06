@@ -2,15 +2,18 @@ package com.example.mummoomserver.domain.Post.controller;
 
 import com.example.mummoomserver.config.resTemplate.ResponeException;
 import com.example.mummoomserver.config.resTemplate.ResponseTemplate;
+import com.example.mummoomserver.domain.Post.Post;
+import com.example.mummoomserver.domain.Post.dto.PostIdxResponseDto;
 import com.example.mummoomserver.domain.Post.dto.PostResponseDto;
 import com.example.mummoomserver.domain.Post.dto.PostSaveRequestDto;
 import com.example.mummoomserver.domain.Post.dto.PostUpdateRequestDto;
 import com.example.mummoomserver.domain.Post.service.PostService;
-import com.example.mummoomserver.login.jwt.JwtProvider;
+import com.example.mummoomserver.login.users.service.UserService;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.parameters.P;
 import org.springframework.web.bind.annotation.*;
 import springfox.documentation.annotations.ApiIgnore;
 
@@ -20,60 +23,88 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 public class PostController {
-
-    private final JwtProvider jwtProvider;
     private final PostService postService;
+    private final UserService userService;
 
-
+    @ApiOperation(value="게시글 등록", notes="게시글을 등록합니다. JWT 토큰 입력 필수! 반환값(data) : postIdx")
     @PostMapping("/post")
-    public ResponseTemplate<Long> save(@RequestBody @ApiIgnore PostSaveRequestDto requestDto) {
+    public ResponseTemplate<Long> save(@RequestBody PostSaveRequestDto requestDto) {
         try{
-            String userName = jwtProvider.getUserName();
-            Long result = postService.save(userName, requestDto);
+            String email = userService.getAuthUserEmail();
+            Long result = postService.save(email, requestDto);
             return new ResponseTemplate<>(result);
         } catch (ResponeException e){
-            return new ResponseTemplate<>(e.getStatus(), HttpStatus.BAD_REQUEST);
+            return new ResponseTemplate<>(e.getStatus());
         }
     }
 
+    @ApiOperation(value="게시글 수정", notes="게시글을 수정합니다. JWT 토큰 입력 필수!")
+    @ApiImplicitParam(name="postIdx", value="게시글 식별자")
     @PatchMapping("/post/{postIdx}")
     public ResponseTemplate<String> update(@PathVariable Long postIdx, @RequestBody PostUpdateRequestDto requestDto){
         try {
-            postService.update(postIdx, requestDto);
+            String email = userService.getAuthUserEmail();
             String result = "게시글 수정에 성공했습니다.";
+            postService.update(postIdx, email, requestDto);
             return new ResponseTemplate<>(result);
         } catch (ResponeException e){
-            return new ResponseTemplate<>(e.getStatus(), HttpStatus.BAD_REQUEST);
+            return new ResponseTemplate<>(e.getStatus());
         }
     }
 
+    @ApiOperation(value="게시글 상세 정보 조회", notes="게시글 상세 정보를 조회합니다.")
     @GetMapping("/post/{postIdx}")
-    public ResponseTemplate<PostResponseDto> findByPostIdx(@PathVariable Long postIdx){
+    public ResponseTemplate<PostIdxResponseDto> findByPostIdx(@PathVariable Long postIdx){
         try {
-            PostResponseDto result = postService.findByPostIdx(postIdx);
+            PostIdxResponseDto result = postService.findByPostIdx(postIdx);
             return new ResponseTemplate<>(result);
         } catch (ResponeException e){
-            return new ResponseTemplate<>(e.getStatus(), HttpStatus.BAD_REQUEST);
+            return new ResponseTemplate<>(e.getStatus());
         }
     }
 
+    @ApiOperation(value="게시글 전체 조회", notes="전체 게시글을 조회합니다.")
     @GetMapping("/posts")
     public ResponseTemplate<List<PostResponseDto>> getPosts(){
         try{
             return new ResponseTemplate<>(postService.getPosts());
         } catch (ResponeException e){
-            return new ResponseTemplate<>(e.getStatus(), HttpStatus.BAD_REQUEST);
+            return new ResponseTemplate<>(e.getStatus());
         }
     }
 
+    @ApiOperation(value="게시글 삭제", notes="게시글을 삭제합니다. JWT 토큰 입력 필수!")
     @DeleteMapping("/post/{postIdx}")
     public ResponseTemplate<String> delete(@PathVariable Long postIdx){
         try{
-            postService.delete(postIdx);
+            String email = userService.getAuthUserEmail();
+            postService.delete(email, postIdx);
             String result = "게시글 삭제에 성공했습니다.";
             return new ResponseTemplate<>(result);
         } catch(ResponeException e){
-            return new ResponseTemplate<>(e.getStatus(), HttpStatus.BAD_REQUEST);
+            return new ResponseTemplate<>(e.getStatus());
+        }
+    }
+
+    @ApiOperation(value="내가 쓴 게시글 조회", notes="내가 쓴 게시글을 조회합니다. JWT 토큰 입력 필수!")
+    @GetMapping("/post/findMypost")
+    public ResponseTemplate<List<PostResponseDto>> findMyPost(){
+        try{
+            String email = userService.getAuthUserEmail();
+            return new ResponseTemplate<>(postService.findMyPost(email));
+        }catch(ResponeException e){
+            return new ResponseTemplate<>(e.getStatus());
+        }
+    }
+
+    @ApiOperation(value="좋아요한 게시글 조회", notes="좋아요한 게시글을 조회합니다. JWT 토큰 입력 필수!")
+    @GetMapping("/post/findMyLikes")
+    public ResponseTemplate<List<PostResponseDto>> findMyLikes(){
+        try{
+            String email = userService.getAuthUserEmail();
+            return new ResponseTemplate<>(postService.findMyLikes(email));
+        }catch(ResponeException e){
+            return new ResponseTemplate<>(e.getStatus());
         }
     }
 
