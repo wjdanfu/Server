@@ -18,7 +18,6 @@ public class UserDetailsImpl implements UserDetails {
     private Long userIdx;
     private String nickName;
     private String email;
-    private String username;
     private String password;
     private String imgUrl;
     private UserType type;
