@@ -66,11 +66,14 @@ public class SecurityConfigurer extends WebSecurityConfigurerAdapter {
                         "/v2/api-docs",
                         "/swagger-resources/**",
                         "/webjars/**" ,
+
                         /*Probably not needed*/ "/swagger.json").permitAll()
                 .anyRequest().authenticated() // 그 이외에는 인증된 사용자만 접근 가능하다
                 .and()
                 .logout()
-                .logoutSuccessUrl("/")
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/login")
+                .invalidateHttpSession(true)
                 .and()
                 .oauth2Login()
                 .userInfoEndpoint()

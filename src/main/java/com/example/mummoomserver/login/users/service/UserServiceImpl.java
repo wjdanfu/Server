@@ -1,19 +1,29 @@
 package com.example.mummoomserver.login.users.service;
 
 import com.example.mummoomserver.config.resTemplate.ResponeException;
+import com.example.mummoomserver.config.resTemplate.ResponseTemplate;
+import com.example.mummoomserver.config.resTemplate.ResponseTemplateStatus;
 import com.example.mummoomserver.login.service.UserDetailsImpl;
+import com.example.mummoomserver.login.token.jwt.JwtProvider;
 import com.example.mummoomserver.login.users.*;
+import com.example.mummoomserver.login.users.dto.LoginDto;
 import com.example.mummoomserver.login.users.dto.UserDto;
-import com.example.mummoomserver.login.users.requestResponse.SignUpRequest;
-import com.example.mummoomserver.login.users.requestResponse.UpdateProfileRequest;
+import com.example.mummoomserver.login.users.requestResponse.*;
 import com.example.mummoomserver.login.validation.SimpleFieldError;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+
+import java.util.UUID;
+
+import javax.servlet.http.HttpServletResponse;
+
 
 import static com.example.mummoomserver.config.resTemplate.ResponseTemplateStatus.*;
 
@@ -31,44 +41,96 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    UUID garbagePassword =  UUID.randomUUID();
 
     @Override
     public void saveUser(SignUpRequest signUpRequest){
         checkDuplicateEmail(signUpRequest.getEmail());
+//        if(signUpRequest.getPassword()) throw new ResponeException(INVALID_PASSWORD);
         User user = User.builder()
                 .nickName(signUpRequest.getNickName())
                 .email(signUpRequest.getEmail())
                 .password(passwordEncoder.encode(signUpRequest.getPassword()))
                 .type(UserType.DEFAULT)
-                .role(Role.GUEST)
+                .role(Role.USER)
                 .build();
 
         userRepository.save(user);
     }
 
     @Override
+    public void saveOAuthUser(UserDto userDto){
+        int ran = (int)( Math.random() * 100 );
+        User user = User.builder()
+                .nickName(userDto.getNickName())
+                .email(userDto.getEmail())
+                .password(passwordEncoder.encode(garbagePassword.toString()))
+                .type(UserType.OAUTH)
+                .role(Role.USER)
+                .build();
+
+        userRepository.save(user);
+
+    }
+
+    @Override
     public UserDto getUserProfile(String email) throws ResponeException {
         //이메일을 입력받으면 정보를 내어주는 로직을 짜야함
-        User user = userRepository.findByEmail(email).get();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponeException(INVALID_USER));
         try {
-            return new UserDto(user.getEmail(), user.getNickName(), user.getImgUrl(), user.getPassword());
+            return new UserDto(user.getEmail(), user.getNickName(), user.getImgUrl());
         } catch (Exception e) {
             throw new ResponeException(DATABASE_ERROR);
         }
     }
+
     public void updateProfile(String email, UpdateProfileRequest updateProfileRequest) throws ResponeException {
 
-        User user = userRepository.findByEmail(email).get();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponeException(INVALID_USER));
+
         // 이미지가 변경되었는지 체크
+        if (user.getImgUrl() == null)
+            user.updateImgUrl(updateProfileRequest.getImgUrl());
+
         if (!user.getImgUrl().equals(updateProfileRequest.getImgUrl()))
             user.updateImgUrl(updateProfileRequest.getImgUrl());
 
         //이름이 변경되었는지 체크
         if (!user.getNickName().equals(updateProfileRequest.getNickName()))
             checkDuplicateNickname(updateProfileRequest.getNickName());
-            user.updateName(updateProfileRequest.getNickName());
+            user.updateNickName(updateProfileRequest.getNickName());
+
         userRepository.save(user);
 
+    }
+
+
+    public void updateUserPwd(String email, UpdatePwdRequest updatePwdRequest) throws ResponeException {
+
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponeException(INVALID_USER));
+        if (user.getType().equals(UserType.OAUTH))
+            throw new ResponeException(NO_OAUTH_USER);
+        // 1. 기존 비밀번호와 현재 입력한 비밀번호가 동일한지 확인
+        if (!passwordEncoder.matches(updatePwdRequest.getLastPassword(),user.getPassword()))
+            throw new ResponeException(INVALID_PASSWORD); //여기 에러처리 필요
+
+        try {
+            // 2. 변경될 비밀번호와 기존 비밀번호가 동일한 지 확인, 업데이트 시 새 비밀번호를 인코딩해서 다시 저장
+            if (!user.getPassword().equals(updatePwdRequest.getNewPassword()))
+                user.updatePwd(passwordEncoder.encode(updatePwdRequest.getNewPassword()));
+
+        } catch (Exception e) {
+            throw new ResponeException(DATABASE_ERROR); // 비밀번호가 동일하다는 에러처리
+        }
+        userRepository.save(user);
+
+    }
+
+    public void deleteUser(String email, WithdrawRequest withdrawRequest) throws ResponeException {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponeException(INVALID_PASSWORD));
+        if (!passwordEncoder.matches(withdrawRequest.getWithdrawPassword(), user.getPassword()))
+            throw new ResponeException(INVALID_PASSWORD);
+        userRepository.delete(user);
     }
 
     private void checkDuplicateEmail(String email) {
@@ -103,7 +165,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-
     public String getAuthUserEmail() {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (userDetails instanceof UserDetails) { //인증된 유저여야함

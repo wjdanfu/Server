@@ -8,10 +8,14 @@ import com.example.mummoomserver.login.users.User;
 import com.example.mummoomserver.login.users.UserRepository;
 import com.example.mummoomserver.login.users.service.UserService;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import static com.example.mummoomserver.config.resTemplate.ResponseTemplateStatus.EMPTY_CONTENT;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -22,8 +26,14 @@ public class NestedCommentController {
 
     @ApiOperation(value="대댓글 작성", notes="대댓글을 작성합니다. JWT 토큰 입력 필수!")
     @PostMapping("/comments/nestedComment/{commentIdx}")
+    @ApiResponses({
+            @ApiResponse(code=3000, message="데이터베이스 요청 에러.")
+            ,@ApiResponse(code=8002, message="존재하지 않는 댓글 입니다.")
+            ,@ApiResponse(code=8006, message="내용을 입력해주세요.")
+    })
     public ResponseTemplate<Long> saveNestedComment(@RequestBody NestedCommentSaveDto requestDto,
                                                 @PathVariable Long commentIdx) throws ResponeException {
+        if(requestDto.getContent()==null)return new ResponseTemplate<>(EMPTY_CONTENT);
         try {
             String email = userService.getAuthUserEmail();
             Long result = nestedCommentService.save(email, commentIdx, requestDto);
@@ -35,6 +45,11 @@ public class NestedCommentController {
 
     @ApiOperation(value="대댓글 삭제", notes="대댓글을 삭제합니다. JWT 토큰 입력 필수!")
     @DeleteMapping("/comments/nestedComment/{nestedCommentIdx}")
+    @ApiResponses({
+            @ApiResponse(code=8001, message="회원정보를 찾을 수 없습니다.")
+            ,@ApiResponse(code=8003, message="존재하지 않는 대댓글 입니다.")
+            ,@ApiResponse(code=8004, message="작성자만 사용할 수 있습니다.")
+    })
     public ResponseTemplate<String> delete(@PathVariable Long nestedCommentIdx){
         try{
             String email = userService.getAuthUserEmail();
