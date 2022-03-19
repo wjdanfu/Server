@@ -15,9 +15,12 @@ import com.example.mummoomserver.domain.Post.dto.PostIdxResponseDto;
 import com.example.mummoomserver.domain.Post.dto.PostResponseDto;
 import com.example.mummoomserver.domain.Post.dto.PostSaveRequestDto;
 import com.example.mummoomserver.domain.Post.dto.PostUpdateRequestDto;
+import com.example.mummoomserver.domain.Report.Report;
+import com.example.mummoomserver.domain.Report.ReportRepository;
 import com.example.mummoomserver.login.users.User;
 import com.example.mummoomserver.login.users.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
@@ -35,6 +38,7 @@ public class PostService {
     private final CommentRepository commentRepository;
     private final NestedCommentRepository nestedCommentRepository;
     private final LikecntRepository likecntRepository;
+    private final ReportRepository reportRepository;
 
     public Long save(String email, PostSaveRequestDto requestDto) throws ResponeException {
         User user = userRepository.findByEmail(email)
@@ -78,6 +82,8 @@ public class PostService {
         postResIdxDto.setLike(isLike);
 
         for (int i = 0; i<comments.size(); i++){
+            if(reportRepository.existsByUser_userIdxAndComment_commentIdx(user.getUserIdx(), comments.get(i).getCommentIdx()))
+                continue;
             CommentResponseDto comment = new CommentResponseDto(comments.get(i));
             commentResponseDtos.add(comment);
             List<NestedComment> nestedComments = nestedCommentRepository.findAllByComment_commentIdx(comments.get(i).getCommentIdx());
@@ -93,10 +99,17 @@ public class PostService {
         return postResIdxDto;
     }
 
-    public List<PostResponseDto> getPosts() throws ResponeException {
-        List<Post> entity = postRepository.findAll();
+    public List<PostResponseDto> getPosts(String email) throws ResponeException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponeException(INVALID_USER));
+        List<Post> entity = postRepository.findAll(Sort.by(Sort.Direction.DESC, "postIdx"));
         List<PostResponseDto> postResDtos = new ArrayList<>();
         for (int i = 0; i < entity.size(); i++){
+            if(reportRepository.existsByUser_userIdxAndPost_postIdx(user.getUserIdx(), entity.get(i).getPostIdx()))
+                continue;
+            if(reportRepository.existsByUser_UserIdxAndReportedUser_UserIdxAndIsBlockedIsTrue(user.getUserIdx(), entity.get(i).getUser().getUserIdx())){
+                continue;
+            }
             PostResponseDto postResponseDto = new PostResponseDto(entity.get(i));
             int likecnt = likecntRepository.countByPost_postIdx(entity.get(i).getPostIdx());
             postResponseDto.setLikecnt(Integer.toString(likecnt));

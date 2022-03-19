@@ -1,6 +1,8 @@
 package com.example.mummoomserver.domain.Report.service;
 
 import com.example.mummoomserver.config.resTemplate.ResponeException;
+import com.example.mummoomserver.domain.Comment.Comment;
+import com.example.mummoomserver.domain.Comment.CommentRepository;
 import com.example.mummoomserver.domain.Post.Post;
 import com.example.mummoomserver.domain.Post.PostRepository;
 import com.example.mummoomserver.domain.Report.Report;
@@ -21,6 +23,7 @@ import static com.example.mummoomserver.config.resTemplate.ResponseTemplateStatu
 public class ReportService {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
     private final ReportRepository reportRepository;
 
     public Long save(String email, Long postIdx, ReportSaveRequestDto requestDto) throws ResponeException {
@@ -38,5 +41,46 @@ public class ReportService {
         } catch (Exception e){
             throw new ResponeException(DATABASE_ERROR);
         }
+    }
+
+    public Long saveComment(String email, Long commentIdx, ReportSaveRequestDto requestDto) throws ResponeException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponeException(INVALID_USER));
+        Comment comment = commentRepository.findByCommentIdx(commentIdx)
+                .orElseThrow(() -> new ResponeException(INVALID_COMMENT_IDX));
+        try {
+            Report report = Report.builder()
+                    .reason(requestDto.getReason())
+                    .user(user)
+                    .comment(comment)
+                    .build();
+            return reportRepository.save(report).getReportIdx();
+        } catch (Exception e){
+            throw new ResponeException(DATABASE_ERROR);
+        }
+    }
+
+    public Long saveUser(String email, Long postIdx, ReportSaveRequestDto requestDto) throws ResponeException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponeException(INVALID_USER));
+        Post post = postRepository.findByPostIdx(postIdx)
+                .orElseThrow(() -> new ResponeException(INVALID_POST_IDX));
+        User reportedUser = userRepository.findByUserIdx(post.getUser().getUserIdx())
+                .orElseThrow(() -> new ResponeException(INVALID_USER));
+        try{
+            Report report = Report.builder()
+                    .reason(requestDto.getReason())
+                    .user(user)
+                    .reportedUser(reportedUser)
+                    .build();
+            return reportRepository.save(report).getReportIdx();
+        } catch(Exception e) {
+            throw new ResponeException(DATABASE_ERROR);
+        }
+    }
+
+    public void blockUser(Long reportIdx) throws ResponeException {
+        Report report = reportRepository.findByReportIdx(reportIdx);
+        report.setBlocked(true);
     }
 }
